@@ -1,0 +1,371 @@
+---
+title: "Binomial Regression: Seed Germination"
+author: "Alex Logan"
+date: "2023-08-10"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(AER)
+library(DHARMa)
+```
+
+
+
+```{r Data Cleaning, echo = FALSE}
+# Read and clean the data:
+seeds <- read.csv("C:/Users/Alexl/Desktop/MXB344_ Generalised Linear Models/Binomial Regression - GLMs (in R)/seeds.csv",header=T)
+
+# Convert 'extract' and 'plant' to factors:
+seeds$extract <- as.factor(seeds$extract)
+seeds$plant <- as.factor(seeds$plant)
+# Store data columns in more convenient form:
+yi <- seeds$germinated
+ni <- seeds$total
+plant <- seeds$plant
+extract <- seeds$extract
+yn <- cbind(seeds$germinated, seeds$total - seeds$germinated) # yn = (y_i, n_i - y_i)
+
+```
+\newpage
+
+## Data:
+The seeds.csv dataset includes the folllowing variables:
+
+```{r DataHead, echo = FALSE}
+head(seeds)
+```
+
+The data arise from a $2^2$ factorial experiment and refer to the number of seeds that successfully germinated on each of 21 plates. \
+The data give the total number of seeds and the total number of these that germinated successfully, for each plate. \
+
+The two factors involved are: \
+- plant type: (bean,cucumber) and \
+- root extract: (O.aegyptiaco73, O.aegyptiaco75) for facilitating germination. \
+
+The root extracts are abbreviated as O.a.73 and O.a.75. \
+
+Typically, a logistic regression is considered for such data (Binomial), however the probit and complementary log-log (cloglog) link functions may also be considered.
+
+## Exploratory Data Analysis:
+
+```{r Exploratory Data Analysis, echo = FALSE}
+# plot covariates against response (careful of Inf values)
+par(mfrow=c(1,2))
+plot(seeds$extract, log( (yi+1.5)/ni ))
+plot(seeds$plant, log( (yi+1.5)/ni+1.5 ))
+
+boxplot(log((yi+1.5)/ni)~seeds$extract*seeds$plant)
+```
+
+
+
+## Logit Link Function Model and Goodnes of Fit:
+
+```{r Log1, include = FALSE}
+## Fit Model using Logit link function
+m1 <- glm(data = seeds, formula = yn ~ plant + extract, family = "binomial"(link="logit"))
+summary(m1)
+```
+
+As per Appendix 1.1, the model without interaction terms shows strong significance in the intercept and plant(cucumber) terms.
+
+```{r Log2, include = FALSE}
+m2 <- glm(data = seeds, formula = yn ~ plant*extract, family = "binomial"(link="logit"))
+summary(m2)
+```
+
+As in Appendix 1.2, the Model with interaction term shows strong significance in the intercept and plant(cucumber) terms, also showing a significant interaction effect between plant(cucumber) and extract(Oa75).
+
+```{r Log3, include = FALSE}
+m3 <- glm(data = seeds, formula = yn ~ plant*extract, family = quasibinomial(link=logit))
+summary(m3)
+```
+Overdispersed model with interaction term shows strong significance in the intercept and plant(cucumber) terms, while no longer showing as significant an interaction effect between plant(cucumber) and extract(Oa75), as seen in Appendix 1.3.
+
+Test for Overdispersion: \
+```{r DispTest_logit, echo = FALSE}
+# Test for overdispersion
+testDispersion(m1,alternative = "greater")
+# not significantly overdispersed
+```
+
+No evidence to suggest the data are significantly overdispersed. 
+
+\newpage
+
+Evaluate Pearson Residuals: \
+```{r PearsRes_logit, echo = FALSE}
+# Check Pearson Residuals
+plot(fitted.values(m3),residuals(m3))
+points(c(0.3,0.7),c(0,0),type="l")
+```
+No apparent trend in the Pearson’s residuals. 
+
+\newpage
+
+Evaluate Simulated Residuals: \
+```{r SimRes_logit, echo = FALSE}
+# Check simulated residuals 
+res=simulateResiduals(m2) 
+plot(res)
+# Significant departure from uniform distribution
+```
+
+Simulated residuals demonstrate significant departure from the uniform distribution.
+
+
+## Probit Link Function Model and Goodness of Fit:
+```{r Prob1, include = FALSE}
+## Fit Model using Probit link function
+m4 <- glm(data=seeds, formula= yn ~ extract + plant, family=binomial(link="probit"))
+summary(m4)
+```
+
+The model without interaction term shows strong significance in the intercept and plant(cucumber) terms (Appendix 2.1).
+
+
+```{r prob2, include = FALSE}
+m5 <- glm(data=seeds, formula= yn ~ extract*plant, family=binomial(link="probit"))
+summary(m5)
+```
+
+As seen in Appendix 2.2, the model with interaction term shows strong significance in the intercept and plant(cucumber) terms, also showing a significant interaction effect between plant(cucumber) and extract(Oa75).
+
+
+Test for Overdispersion: Still no evidence to suggest the data are significantly overdispersed (Appendix 2.3).
+```{r DispTest_probit, include = FALSE}
+# Overdispersion test
+testDispersion(m4,alternative="greater")
+# Still not significantly overdispersed
+```
+
+
+
+Evaluate Pearson Residuals: No apparent trend in the Pearson’s residuals (Appendix 2.4).
+```{r PearsRes_probit, include = FALSE}
+# Pearson Residuals test
+plot(fitted(m5),resid(m5))
+lines(c(min(fitted(m5)),max(fitted(m5))),c(0,0))
+```
+
+
+
+Evaluate Simulated Residuals: Still significant departure from the uniform distribution (Appendix 2.5).
+```{r SimRes_probit, include = FALSE}
+# Simulated residuals test
+resp <- simulateResiduals(m5)
+plot(resp)
+# Still significant departure from Uniform distribution
+```
+
+
+## Complementary Log-Log Link Function Model and Goodness of Fit:
+
+```{r clog1, include = FALSE}
+## Fit Model using Complementary Log-Log link function
+m6 <- glm(data = seeds, formula = yn ~ plant + extract, family = binomial(link="cloglog"))
+summary(m6)
+```
+
+The model without interaction term shows strong significance in the intercept, plant(cucumber) and extract(Oa75) terms (Appendix 3.1).
+
+
+```{r clog2, include = FALSE}
+m7 <- glm(data = seeds, formula = yn ~ plant*extract, family = binomial(link="cloglog"))
+summary(m7)
+```
+
+As seen in Appendix 3.2, the model with interaction term shows strong significance in the intercept and plant(cucumber) terms, also showing a significant interaction effect between plant(cucumber) and extract(Oa75).
+
+
+Test for Overdispersion: Still no evidence to suggest the data are significantly overdispersed (Appendix 3.3). 
+```{r DispTest_cloglog, include = FALSE}
+# Overdispersion test
+testDispersion(m6, alternative = "greater")
+# Still not significantly overdispersed
+```
+
+
+Evaluate Pearson Residuals: No apparent trend in the Pearson’s residuals (Appendix 3.4).
+```{r PearsRes_cloglog, include = FALSE}
+# Pearson Residuals test
+plot(fitted(m7),resid(m7))
+lines(c(min(fitted(m7)),max(fitted(m7))),c(0,0))
+```
+
+Evaluate Simulated Residuals: Still significant departure from Uniform distribution (Appendix 3.5).
+```{r SimRes_cloglog, include = FALSE}
+# Simulated Residuals test
+resc <- simulateResiduals(m7)
+plot(resc)
+# Still significant departure from Uniform distribution
+```
+
+None of the alternative link functions appear to model the data better than the logistic link function.
+
+## Predictive Performance
+
+```{r Predictive Performance, message = FALSE}
+## Test model predictive power (Leave-One-Out Cross Validation)
+attach(seeds)
+pred <- as.numeric()
+for(i in 1:length(germinated)){
+  temp <- data.frame(germinated=germinated[-i],total=total[-i],extract=extract[-i],plant=plant[-i])
+  yntemp <- cbind(temp$germinated,temp$total-temp$germinated)
+  fit.cv <- glm(yntemp ~ extract + plant + extract*plant,family="binomial",data=temp)
+  predlp <- predict(fit.cv,newdata=data.frame(extract=extract[i],plant=plant[i]))
+  pred[i] <- exp(predlp)/(1+exp(predlp))*total[i]
+}
+plot(germinated,pred)
+points(c(0,70),c(0,70),type="l")
+
+```
+
+There appears to be agreement between the predicted and observed data, with some very minor fanning as the response increases. 
+Thus, it can be concluded that the proposed model is a reasonable fit to the data.
+
+In summary, the following model was developed for these data:
+$$  log \left(\frac{\pi_i}{1- \pi_i} \right) = \beta_0 + \beta_1 x_{1i} + \beta_2 x_{2i} + \beta_3 x_{1i} x_{2i} $$
+where $x_{1i}$ and $x_{2i}$ are indicator variables denoting varieties of extract and plant, respectively.
+
+The model indicates a significant interaction between extract and plant type, with the combination of Oa75 and cucumber leading to, on average, a reduced number of germinated seeds. 
+Specifically, this interaction term reduced the log odds of seed germination by, on average, 0.7781 (SE: 0.3064). 
+Extract does not appear to be significant as a main effect, however, plant is increasing the log odds, on average, by 1.3182 (SE: 0.1775).
+
+There is no apparent trend in the Pearson’s residuals, however, some lack-of-fit was noted when a form of
+simulated residuals were considered which suggest that the model may not fit the data appropriately.
+
+To further assess this, the predictive performance of the model was assessed through leave-one-out cross validation, demonstrating that the out-of-sample model predictions were unbiased and therefore suggesting the proposed model is reasonable.
+
+
+
+## Appendix
+# 1 - Logit Link Function Model
+# 1.1 - No Interaction Term Model Summary
+```{r Log1_App, echo = FALSE}
+summary(m1)
+```
+
+# 1.2 - With Interation Term Model Summary
+```{r Log2_App, echo = FALSE}
+summary(m2)
+```
+
+# 1.3 - With Interaction Term Overdispersed Model Summary
+```{r Log3_App, echo = FALSE}
+summary(m3)
+```
+# 2 - Probit Link Function Model
+# 2.1 - No Interaction Term Model Summary
+```{r Prob1_App, echo = FALSE}
+summary(m4)
+```
+
+# 2.2 - With Interaction Term Overdispersed Model Summary
+```{r prob2_App, echo = FALSE}
+summary(m5)
+```
+
+
+# 2.3 - Overdispersion Test Results
+```{r DispTest_probit_App, echo = FALSE}
+# Overdispersion test
+testDispersion(m4,alternative="greater")
+# Still not significantly overdispersed
+```
+
+# 2.4 - Pearson Residuals
+```{r PearsRes_probit_App, echo = FALSE}
+# Pearson Residuals test
+plot(fitted(m5),resid(m5))
+lines(c(min(fitted(m5)),max(fitted(m5))),c(0,0))
+```
+
+# 2.5 - Simulated Residuals
+```{r SimRes_probit_App, echo = FALSE}
+# Simulated residuals test
+resp <- simulateResiduals(m5)
+plot(resp)
+# Still significant departure from Uniform distribution
+```
+
+# 3 - Complementary log-log Link Function Model
+# 3.1 - No Interaction Term Model Summary
+```{r clog1_App, echo = FALSE}
+summary(m6)
+```
+
+# 3.2 - With Interaction Term Model Summary
+```{r clog2_App, echo = FALSE}
+summary(m7)
+```
+
+# 3.3 - Overdispersion Test Results
+```{r DispTest_cloglog_App, echo = FALSE}
+# Overdispersion test
+testDispersion(m6, alternative = "greater")
+# Still not significantly overdispersed
+```
+
+# 3.4 - Pearson Residuals
+```{r PearsRes_cloglog_App, echo = FALSE}
+# Pearson Residuals test
+plot(fitted(m7),resid(m7))
+lines(c(min(fitted(m7)),max(fitted(m7))),c(0,0))
+```
+
+# 3.5 - Simulated Residuals
+```{r SimRes_cloglog_App, echo = FALSE}
+# Simulated Residuals test
+resc <- simulateResiduals(m7)
+plot(resc)
+# Still significant departure from Uniform distribution
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
